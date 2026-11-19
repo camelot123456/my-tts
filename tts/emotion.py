@@ -175,8 +175,11 @@ def parse_segments(
                     segments.append((content, preset))
                 continue
 
-        # Xử lý các thẻ inline / block trong dòng
-        matches = list(TAG_REGEX.finditer(line))
+        # Xử lý các thẻ cảm xúc inline / block trong dòng (chỉ bắt các thẻ cảm xúc hợp lệ, bỏ qua thẻ ngôn ngữ như [en], [vi])
+        matches = [
+            m for m in TAG_REGEX.finditer(line)
+            if m.group(2).lower() in EMOTION_PRESETS or m.group(2).lower() in EMOTION_ALIASES
+        ]
         if not matches:
             # Không có thẻ nào trên dòng này
             effective_preset = active_block_emotion or default_preset

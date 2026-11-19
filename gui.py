@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Dict
 
+from tts.code_switch import get_paired_voice
 from tts.config import VoiceInfo, get_voices_for_language
 from tts.emotion import EMOTION_PRESETS, get_emotion_preset
 from tts.engine import TTSEngine, parse_speed
@@ -30,7 +31,8 @@ TRANSLATIONS = {
         "browse_txt_btn": "📁 Browse .txt file...",
         "text_preview_frame": " Text Content & Editor ",
         "insert_tag_btn": "➕ Insert Emotion Tag [tag]",
-        "tag_hint": "Add [tag] at beginning of line or wrap [tag]...[/tag]",
+        "insert_lang_btn": "🌐 Lang Tag [en]/[vi]",
+        "tag_hint": "Add [tag] or [en]...[/en] in text",
         "block_tag_label": "{}...[/{}] (Block for long paragraph)",
         "settings_frame": " Voice, Speed & Emotion Settings ",
         "target_lang_label": "Speech Language:",
@@ -40,6 +42,10 @@ TRANSLATIONS = {
         "engine_edge": "edge-tts (Microsoft AI Neural - Recommended)",
         "engine_gtts": "gtts (Google Translate)",
         "voice_label": "Voice:",
+        "code_switch_frame": " English Code-Switching (Bilingual) ",
+        "code_switch_chk": "Native English pronunciation for English terms",
+        "auto_lang_chk": "Auto-detect English terms (AI, deadline...)",
+        "paired_voice_lbl": "Paired Voice:",
         "emotion_label": "Default Emotion (for untagged sentences):",
         "detect_tags_chk": "Detect [tag] emotion tags in text",
         "auto_emotion_chk": "Auto-detect emotion from punctuation (!, ...)",
@@ -82,7 +88,8 @@ TRANSLATIONS = {
         "browse_txt_btn": "📁 Duyệt tệp .txt...",
         "text_preview_frame": " Nội dung văn bản & Soạn thảo ",
         "insert_tag_btn": "➕ Chèn thẻ cảm xúc [tag]",
-        "tag_hint": "Gắn [tag] đầu câu hoặc bọc [tag]...[/tag]",
+        "insert_lang_btn": "🌐 Thẻ [en]/[vi]",
+        "tag_hint": "Gắn [tag] hoặc [en]...[/en] trong văn bản",
         "block_tag_label": "{}...[/{}] (Cặp thẻ cho đoạn dài)",
         "settings_frame": " Cài đặt Giọng nói, Tốc độ & Cảm xúc ",
         "target_lang_label": "Ngôn ngữ đọc:",
@@ -92,6 +99,10 @@ TRANSLATIONS = {
         "engine_edge": "edge-tts (Microsoft AI Neural - Khuyên dùng)",
         "engine_gtts": "gtts (Google Translate)",
         "voice_label": "Giọng đọc (Voice):",
+        "code_switch_frame": " Phát âm Tiếng Anh chuẩn (Song ngữ) ",
+        "code_switch_chk": "Phát âm chuẩn bản ngữ cho từ/câu Tiếng Anh",
+        "auto_lang_chk": "Tự động phát hiện từ mượn tiếng Anh (AI, deadline...)",
+        "paired_voice_lbl": "Giọng Anh ghép đôi:",
         "emotion_label": "Cảm xúc mặc định (cho câu không gắn thẻ):",
         "detect_tags_chk": "Nhận diện thẻ [tag] cảm xúc trong văn bản",
         "auto_emotion_chk": "Tự động đoán cảm xúc qua dấu câu (!, ...)",
@@ -165,11 +176,17 @@ class TTSAppGUI:
         self.var_emotions_enabled = tk.BooleanVar(value=True)
         self.var_auto_emotion = tk.BooleanVar(value=False)
 
+        # Code-switching variables
+        self.var_code_switch = tk.BooleanVar(value=True)
+        self.var_auto_lang = tk.BooleanVar(value=True)
+        self.var_paired_voice = tk.StringVar()
+
         self.var_status = tk.StringVar()
         self.var_progress = tk.DoubleVar(value=0.0)
         self.var_char_count = tk.StringVar(value="0 characters | 0 words")
 
         self.voice_map: Dict[str, VoiceInfo] = {}
+        self.paired_voice_map: Dict[str, VoiceInfo] = {}
 
         self._build_ui()
         self._update_ui_language()
@@ -265,6 +282,11 @@ class TTSAppGUI:
         self.btn_insert_tag["menu"] = self.tag_menu
         self.btn_insert_tag.pack(side=tk.LEFT)
 
+        self.btn_insert_lang = ttk.Menubutton(toolbar, text="")
+        self.lang_tag_menu = tk.Menu(self.btn_insert_lang, tearoff=0)
+        self.btn_insert_lang["menu"] = self.lang_tag_menu
+        self.btn_insert_lang.pack(side=tk.LEFT, padx=(6, 0))
+
         self.lbl_tag_hint = ttk.Label(
             toolbar,
             text="",
@@ -283,6 +305,7 @@ class TTSAppGUI:
             borderwidth=1,
         )
         self.text_preview.tag_config("emotion_tag", foreground="#B45309", font=("Segoe UI", 10, "bold"))
+        self.text_preview.tag_config("lang_tag", foreground="#0D9488", font=("Segoe UI", 10, "bold"))
 
         scroll_y = ttk.Scrollbar(self.preview_frame, orient=tk.VERTICAL, command=self.text_preview.yview)
         self.text_preview.configure(yscrollcommand=scroll_y.set)
@@ -334,6 +357,38 @@ class TTSAppGUI:
         self.lbl_voice.pack(anchor=tk.W, pady=(4, 2))
         self.cb_voice = ttk.Combobox(self.settings_frame, textvariable=self.var_voice_name, state="readonly")
         self.cb_voice.pack(fill=tk.X, pady=(0, 8))
+        self.cb_voice.bind("<<ComboboxSelected>>", self._on_voice_changed)
+
+        # Code-Switching Section (Bilingual Pronunciation)
+        self.cs_frame = ttk.LabelFrame(self.settings_frame, text="", padding=6)
+        self.cs_frame.pack(fill=tk.X, pady=(0, 8))
+
+        self.chk_code_switch = ttk.Checkbutton(
+            self.cs_frame,
+            text="",
+            variable=self.var_code_switch,
+            command=self._on_code_switch_toggled,
+        )
+        self.chk_code_switch.pack(anchor=tk.W)
+
+        self.chk_auto_lang = ttk.Checkbutton(
+            self.cs_frame,
+            text="",
+            variable=self.var_auto_lang,
+        )
+        self.chk_auto_lang.pack(anchor=tk.W)
+
+        paired_v_box = ttk.Frame(self.cs_frame)
+        paired_v_box.pack(fill=tk.X, pady=(4, 2))
+        self.lbl_paired_voice = ttk.Label(paired_v_box, text="", font=("Segoe UI", 8, "bold"))
+        self.lbl_paired_voice.pack(side=tk.LEFT)
+
+        self.cb_paired_voice = ttk.Combobox(
+            paired_v_box,
+            textvariable=self.var_paired_voice,
+            state="readonly",
+        )
+        self.cb_paired_voice.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(4, 0))
 
         # Default Emotion
         self.lbl_emotion = ttk.Label(self.settings_frame, text="", font=("Segoe UI", 9, "bold"))
@@ -492,6 +547,7 @@ class TTSAppGUI:
         self.btn_browse_input.config(text=self.t("browse_txt_btn"))
         self.preview_frame.config(text=self.t("text_preview_frame"))
         self.btn_insert_tag.config(text=self.t("insert_tag_btn"))
+        self.btn_insert_lang.config(text=self.t("insert_lang_btn"))
         self.lbl_tag_hint.config(text=self.t("tag_hint"))
 
         # Re-populate emotion tag menu
@@ -509,6 +565,17 @@ class TTSAppGUI:
                 command=lambda k=b_tag: self._insert_block_tag(k),
             )
 
+        # Re-populate language tag menu
+        self.lang_tag_menu.delete(0, tk.END)
+        self.lang_tag_menu.add_command(
+            label=f"[en]...[/en] - {self.t('insert_en_tag')}",
+            command=lambda: self._insert_lang_tag("en"),
+        )
+        self.lang_tag_menu.add_command(
+            label=f"[vi]...[/vi] - {self.t('insert_vi_tag')}",
+            command=lambda: self._insert_lang_tag("vi"),
+        )
+
         self.settings_frame.config(text=self.t("settings_frame"))
         self.lbl_target_lang.config(text=self.t("target_lang_label"))
         self.rb_lang_vi.config(text=self.t("lang_vi"))
@@ -524,6 +591,14 @@ class TTSAppGUI:
             self.cb_engine.current(0)
 
         self.lbl_voice.config(text=self.t("voice_label"))
+
+        # Code-Switching section
+        self.cs_frame.config(text=self.t("code_switch_frame"))
+        self.chk_code_switch.config(text=self.t("code_switch_chk"))
+        self.chk_auto_lang.config(text=self.t("auto_lang_chk"))
+        self.lbl_paired_voice.config(text=self.t("paired_voice_lbl"))
+        self._on_code_switch_toggled()
+
         self.lbl_emotion.config(text=self.t("emotion_label"))
 
         # Emotion presets combobox
@@ -574,13 +649,50 @@ class TTSAppGUI:
         self._update_char_count()
         self.text_preview.focus_set()
 
+    def _insert_lang_tag(self, lang_code: str):
+        try:
+            sel_first = self.text_preview.index(tk.SEL_FIRST)
+            sel_last = self.text_preview.index(tk.SEL_LAST)
+            sel_text = self.text_preview.get(sel_first, sel_last)
+            self.text_preview.delete(sel_first, sel_last)
+            self.text_preview.insert(sel_first, f"[{lang_code}]{sel_text}[/{lang_code}]")
+        except tk.TclError:
+            default_word = "Machine Learning" if lang_code == "en" else "xin chào"
+            self.text_preview.insert(tk.INSERT, f"[{lang_code}]{default_word}[/{lang_code}]")
+        self._highlight_tags()
+        self._update_char_count()
+        self.text_preview.focus_set()
+
     def _highlight_tags(self):
         self.text_preview.tag_remove("emotion_tag", "1.0", tk.END)
+        self.text_preview.tag_remove("lang_tag", "1.0", tk.END)
         content = self.text_preview.get("1.0", tk.END)
-        for m in re.finditer(r"\[(/?)[a-zA-Z0-9_]+\]", content):
+        for m in re.finditer(r"\[(/?)([a-zA-Z0-9_]+)\]", content):
             start_idx = f"1.0+{m.start()}c"
             end_idx = f"1.0+{m.end()}c"
-            self.text_preview.tag_add("emotion_tag", start_idx, end_idx)
+            tag_name = m.group(2).lower()
+            if tag_name in ["en", "english", "us", "uk", "vi", "vietnamese"]:
+                self.text_preview.tag_add("lang_tag", start_idx, end_idx)
+            else:
+                self.text_preview.tag_add("emotion_tag", start_idx, end_idx)
+
+    def _on_code_switch_toggled(self):
+        enabled = self.var_code_switch.get()
+        state = tk.NORMAL if enabled else tk.DISABLED
+        self.chk_auto_lang.config(state=state)
+        self.cb_paired_voice.config(state="readonly" if enabled else tk.DISABLED)
+
+    def _on_voice_changed(self, event=None):
+        selected_display = self.var_voice_name.get()
+        base_v = self.voice_map.get(selected_display)
+        if not base_v:
+            return
+        target_lang = "en" if self.var_speech_lang.get().startswith("vi") else "vi"
+        paired_id = get_paired_voice(base_v.id, target_lang=target_lang)
+        for d_name, v_info in self.paired_voice_map.items():
+            if v_info.id == paired_id:
+                self.cb_paired_voice.set(d_name)
+                break
 
     def set_speed(self, multiplier: float):
         mult = max(0.25, min(3.0, round(float(multiplier), 2)))
@@ -688,6 +800,35 @@ class TTSAppGUI:
             self.cb_voice.current(0)
             self.var_voice_name.set(display_names[0])
 
+        # Update paired voices for Code-Switching
+        paired_lang = "en" if lang.startswith("vi") else "vi"
+        paired_voices = get_voices_for_language(paired_lang)
+        self.paired_voice_map.clear()
+        paired_display_names = []
+        for pv in paired_voices:
+            if use_gtts and pv.engine != "gtts":
+                continue
+            if not use_gtts and pv.engine != "edge-tts":
+                continue
+            p_display = f"{pv.name}"
+            self.paired_voice_map[p_display] = pv
+            paired_display_names.append(p_display)
+
+        self.cb_paired_voice["values"] = paired_display_names
+        if paired_display_names:
+            base_v = self.voice_map.get(self.var_voice_name.get())
+            default_paired_id = get_paired_voice(base_v.id if base_v else "", target_lang=paired_lang)
+            matched_name = None
+            for d_name, p_info in self.paired_voice_map.items():
+                if p_info.id == default_paired_id:
+                    matched_name = d_name
+                    break
+            if matched_name:
+                self.cb_paired_voice.set(matched_name)
+            else:
+                self.cb_paired_voice.current(0)
+                self.var_paired_voice.set(paired_display_names[0])
+
     def _on_text_modified(self, event=None):
         self._highlight_tags()
         self._update_char_count()
@@ -733,6 +874,13 @@ class TTSAppGUI:
         emotions_enabled = self.var_emotions_enabled.get()
         auto_emotion = self.var_auto_emotion.get()
 
+        # Code-switching selection
+        code_switch_enabled = self.var_code_switch.get()
+        auto_lang = self.var_auto_lang.get()
+        selected_paired_display = self.var_paired_voice.get()
+        paired_voice_info = self.paired_voice_map.get(selected_paired_display)
+        paired_voice_id = paired_voice_info.id if paired_voice_info else None
+
         self.is_converting = True
         self.btn_convert.config(text=self.t("converting_btn"), state=tk.DISABLED, bg="#9CA3AF")
         self.btn_open_folder.config(state=tk.DISABLED)
@@ -752,6 +900,9 @@ class TTSAppGUI:
                 emotions_enabled,
                 default_emo_key,
                 auto_emotion,
+                code_switch_enabled,
+                paired_voice_id,
+                auto_lang,
             ),
             daemon=True,
         )
@@ -769,6 +920,9 @@ class TTSAppGUI:
         emotions_enabled,
         default_emo_key,
         auto_emotion,
+        code_switch,
+        paired_voice_id,
+        auto_detect_en,
     ):
         def update_progress(pct, msg):
             self.root.after(0, lambda: self._on_progress_update(pct, msg))
@@ -785,6 +939,9 @@ class TTSAppGUI:
                 emotions=emotions_enabled,
                 default_emotion=default_emo_key,
                 auto_emotion=auto_emotion,
+                code_switch=code_switch,
+                paired_voice_id=paired_voice_id,
+                auto_detect_en=auto_detect_en,
                 progress_callback=update_progress,
             )
             self.last_output_file = saved_file

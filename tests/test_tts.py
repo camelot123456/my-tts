@@ -11,6 +11,13 @@ from tts.config import (
     get_voice_info,
     get_voices_for_language,
 )
+from tts.code_switch import (
+    CodeSwitchChunk,
+    detect_english_phrases,
+    get_paired_voice,
+    is_english_token,
+    parse_code_switch_segments,
+)
 from tts.emotion import (
     EMOTION_PRESETS,
     combine_emotion_and_speed,
@@ -225,6 +232,93 @@ class TestEmotionSystem(unittest.TestCase):
         self.assertEqual(p2, "+30Hz")
         self.assertEqual(v2, "+5%")
         self.assertAlmostEqual(mult2, 1.40)
+
+
+class TestCodeSwitch(unittest.TestCase):
+    def test_get_paired_voice(self):
+        # Male Vietnamese -> Male English
+        self.assertEqual(get_paired_voice("vi-VN-NamMinhNeural"), "en-US-GuyNeural")
+        # Female Vietnamese -> Female English
+        self.assertEqual(get_paired_voice("vi-VN-HoaiMyNeural"), "en-US-JennyNeural")
+        # gTTS pairing
+        self.assertEqual(get_paired_voice("vi"), "en")
+        self.assertEqual(get_paired_voice("en"), "vi")
+        # Reverse pairing
+        self.assertEqual(get_paired_voice("en-US-GuyNeural"), "vi-VN-NamMinhNeural")
+
+    def test_is_english_token(self):
+        # Common English tech / business terms
+        self.assertTrue(is_english_token("deadline"))
+        self.assertTrue(is_english_token("Python"))
+        self.assertTrue(is_english_token("AI"))
+        self.assertTrue(is_english_token("feedback"))
+        self.assertTrue(is_english_token("meeting"))
+
+        # Words with letters w, f, j, z
+        self.assertTrue(is_english_token("flow"))
+        self.assertTrue(is_english_token("zoom"))
+        self.assertTrue(is_english_token("join"))
+
+        # English suffixes
+        self.assertTrue(is_english_token("training"))
+        self.assertTrue(is_english_token("management"))
+
+        # Vietnamese homographs without diacritics must NOT be detected as English
+        self.assertFalse(is_english_token("la"))
+        self.assertFalse(is_english_token("va"))
+        self.assertFalse(is_english_token("di"))
+        self.assertFalse(is_english_token("co"))
+        self.assertFalse(is_english_token("to"))
+        self.assertFalse(is_english_token("me"))
+        self.assertFalse(is_english_token("an"))
+
+    def test_detect_english_phrases(self):
+        text = "Dự án này ứng dụng machine learning và deep learning rất hiệu quả."
+        segments = detect_english_phrases(text)
+        # Should identify machine learning and deep learning as en
+        en_texts = [t for t, lang in segments if lang == "en"]
+        self.assertTrue(any("machine learning" in t for t in en_texts))
+        self.assertTrue(any("deep learning" in t for t in en_texts))
+
+        vi_texts = [t for t, lang in segments if lang == "vi"]
+        self.assertTrue(any("Dự án này ứng dụng" in t for t in vi_texts))
+
+    def test_parse_code_switch_explicit_tags(self):
+        text = "Hôm nay tôi nghiên cứu [en]Artificial Intelligence[/en] để làm đồ án."
+        chunks = parse_code_switch_segments(
+            text=text,
+            base_voice_id="vi-VN-NamMinhNeural",
+            base_lang="vi",
+            auto_detect=False,
+        )
+        self.assertEqual(len(chunks), 3)
+        self.assertEqual(chunks[0].lang, "vi")
+        self.assertEqual(chunks[0].voice_id, "vi-VN-NamMinhNeural")
+
+        self.assertEqual(chunks[1].lang, "en")
+        self.assertEqual(chunks[1].text, "Artificial Intelligence")
+        self.assertEqual(chunks[1].voice_id, "en-US-GuyNeural")
+
+        self.assertEqual(chunks[2].lang, "vi")
+        self.assertEqual(chunks[2].voice_id, "vi-VN-NamMinhNeural")
+
+    def test_parse_code_switch_with_emotion_preservation(self):
+        text = "[hao_hung]Chúng tôi vừa ra mắt [en]machine learning[/en] model mới![/hao_hung]"
+        chunks = parse_code_switch_segments(
+            text=text,
+            base_voice_id="vi-VN-HoaiMyNeural",
+            base_lang="vi",
+            auto_detect=True,
+        )
+        self.assertGreaterEqual(len(chunks), 2)
+        for c in chunks:
+            self.assertEqual(c.emotion_preset.key, "hao_hung")
+
+        # Female Vietnamese pairs with Jenny
+        vi_chunk = next(c for c in chunks if c.lang == "vi")
+        en_chunk = next(c for c in chunks if c.lang == "en")
+        self.assertEqual(vi_chunk.voice_id, "vi-VN-HoaiMyNeural")
+        self.assertEqual(en_chunk.voice_id, "en-US-JennyNeural")
 
 
 if __name__ == "__main__":

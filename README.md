@@ -18,6 +18,10 @@ A versatile, high-quality Python Text-to-Speech (TTS) application that converts 
 - **Sentence-Level Emotion Tags:**
   - Control emotions on a per-sentence or per-block basis using tags such as `[vui]` / `[happy]`, `[buon]` / `[sad]`, `[hao_hung]` / `[excited]`, `[gian]` / `[angry]`, `[thi_tham]` / `[whisper]`, `[so_hai]` / `[scared]`, and `[nghiem_tuc]` / `[serious]`.
   - Optional automatic emotion detection based on punctuation (`!` for excitement, `...` for sadness/pause).
+- **Mixed-Language Code-Switching (Vietnamese & English):**
+  - **Native English Pronunciation:** When reading Vietnamese text containing English words or sentences, the system seamlessly switches to a native English neural voice with 100% natural pronunciation.
+  - **Gender-Matched Voice Pairing:** Automatically pairs `Nam Minh` (Male Vietnamese) with `Guy` (Male US English) and `Hoài My` (Female Vietnamese) with `Jenny` (Female US English) for a smooth, single-speaker experience.
+  - **Smart Loanword Detection & Explicit Tags:** Automatically recognizes common tech and business loanwords (*AI, Machine Learning, deadline, feedback, database, developer...*) or lets you explicitly mark phrases with `[en]...[/en]` and `[vi]...[/vi]` tags.
 - **Two User Interfaces:**
   - **Desktop GUI (Tkinter):** Clean, modern, responsive window supporting **bilingual UI (English & Vietnamese)** with on-the-fly language switching, text preview/editor, emotion tag insertion, character/word counter, and one-click audio playback.
   - **Command-Line Interface (CLI):** Full-featured CLI for automation, scripting, and interactive step-by-step prompts.
@@ -141,7 +145,37 @@ Regular sentences without tags will be spoken with natural normal tone.
   python main.py sample_texts/cam_xuc.txt -o plain.mp3 --no-emotion
   ```
 
-### 7. Interactive Mode
+### 7. Bilingual Mixed-Language Code-Switching (Vietnamese & English)
+
+When reading Vietnamese text containing English words or phrases, the engine automatically pronounces English terms with native US English pronunciation:
+
+- **Smart Auto-Detection (Default):**
+  Common tech and business terms (*AI, machine learning, Python, database, deadline, feedback, developer...*) are automatically detected and spoken with the paired native English voice without needing any tags:
+  ```bash
+  python main.py sample_texts/song_ngu.txt -o audio_songngu.mp3 --voice namminh
+  ```
+- **Explicit Language Tags `[en]...[/en]` & `[vi]...[/vi]`:**
+  For any sentence, idiom, or custom phrase, wrap it in `[en]...[/en]` for English or `[vi]...[/vi]` for Vietnamese:
+  ```text
+  Thông điệp quan trọng của buổi meeting hôm nay:
+  [en]Innovation distinguishes between a leader and a follower.[/en]
+  [en]Thank you very much for your feedback and support![/en]
+  ```
+- **Custom Paired English Voice:**
+  Override the default gender pairing with `--en-voice`:
+  ```bash
+  python main.py sample_texts/song_ngu.txt -o out.mp3 --voice namminh --en-voice jenny
+  ```
+- **Disable Auto-Detection (Tags Only):**
+  ```bash
+  python main.py sample_texts/song_ngu.txt -o out.mp3 --no-auto-lang
+  ```
+- **Disable Code-Switching (Single Voice Only):**
+  ```bash
+  python main.py sample_texts/song_ngu.txt -o out.mp3 --no-code-switch
+  ```
+
+### 8. Interactive Mode
 Run without arguments for an interactive step-by-step questionnaire:
 ```bash
 python main.py
@@ -186,6 +220,7 @@ python main.py
 my_TTS/
 ├── tts/
 │   ├── __init__.py
+│   ├── code_switch.py      # Mixed-language parser, gender voice pairing & auto-detection
 │   ├── config.py           # Voice catalog and default configurations
 │   ├── emotion.py          # Emotion presets, tag parsing, and parameter blending
 │   ├── text_processor.py   # Multi-encoding file reader and sentence chunker
@@ -193,10 +228,11 @@ my_TTS/
 ├── sample_texts/
 │   ├── tieng_viet.txt      # Vietnamese sample text
 │   ├── english.txt         # English sample text
-│   └── cam_xuc.txt         # Multilingual emotion tags sample text
+│   ├── cam_xuc.txt         # Multilingual emotion tags sample text
+│   └── song_ngu.txt        # Bilingual mixed-language sample text
 ├── tests/
 │   ├── __init__.py
-│   └── test_tts.py         # Automated test suite (20 unit tests)
+│   └── test_tts.py         # Automated test suite (25 unit tests)
 ├── main.py                 # Command-line interface (CLI) entry point
 ├── gui.py                  # Desktop graphical user interface (GUI) entry point
 ├── Run_GUI.bat             # Windows one-click GUI launcher (English)
@@ -214,4 +250,4 @@ Run automated unit tests:
 ```bash
 python -m unittest discover tests
 ```
-All 20 tests verify encoding detection, text chunking, speed multiplier parsing, audio stretching, and emotion tag extraction.
+All 25 tests verify encoding detection, text chunking, speed multiplier parsing, audio stretching, emotion tag extraction, and bilingual code-switching with gender-matched voice pairing.

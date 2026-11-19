@@ -137,6 +137,25 @@ def parse_args():
         help="Bỏ qua phân tích cảm xúc (các thẻ cảm xúc sẽ bị lọc bỏ khỏi âm thanh).",
     )
     parser.add_argument(
+        "--no-code-switch",
+        dest="no_code_switch",
+        action="store_true",
+        help="Tắt tính năng chuyển đổi song ngữ (Code-Switching). Chỉ đọc 1 giọng duy nhất.",
+    )
+    parser.add_argument(
+        "--no-auto-lang",
+        dest="no_auto_lang",
+        action="store_true",
+        help="Tắt tự động nhận diện từ tiếng Anh xen kẽ. (Vẫn hỗ trợ thẻ tường minh [en]...[/en]).",
+    )
+    parser.add_argument(
+        "--en-voice",
+        dest="en_voice",
+        default=None,
+        help="Chọn giọng đọc tiếng Anh ghép đôi (ví dụ: jenny, guy, en-US-JennyNeural...).\n"
+        "Mặc định tự động ghép đôi theo giới tính (NamMinh -> Guy, HoaiMy -> Jenny).",
+    )
+    parser.add_argument(
         "--list-voices",
         action="store_true",
         help="Hiển thị danh sách tất cả các giọng đọc được cấu hình sẵn.",
@@ -266,6 +285,9 @@ def main():
         input_path, out_file, lang, voice_id, speed_mult, rate_str, pitch, engine, def_emotion = run_interactive_mode()
         emotions_enabled = True
         auto_emotion = False
+        code_switch = True
+        auto_lang = True
+        paired_en_voice = None
     else:
         input_path = args.input_file
         out_file = args.output_file
@@ -286,6 +308,15 @@ def main():
         def_emotion = args.emotion
         emotions_enabled = not args.no_emotion
         auto_emotion = args.auto_emotion
+        code_switch = not args.no_code_switch
+        auto_lang = not args.no_auto_lang
+        paired_en_voice = None
+        if args.en_voice:
+            try:
+                paired_en_voice = resolve_voice_choice(args.en_voice, "en")
+            except ValueError as err:
+                print(f"[LỖI GIỌNG TIẾNG ANH]: {err}", file=sys.stderr)
+                return 1
 
     if not os.path.isfile(input_path):
         print(f"[LỖI] Không tìm thấy file đầu vào: '{input_path}'", file=sys.stderr)
@@ -300,6 +331,16 @@ def main():
     print(f" Cảm xúc câu:         {emo_info}")
     if auto_emotion:
         print(f" Tự động nhận diện:   Bật (qua '!' và '...')")
+    if code_switch:
+        cs_info = "Bật (Thẻ [en]...[/en]"
+        if auto_lang:
+            cs_info += " + Tự động quét từ mượn tiếng Anh"
+        if paired_en_voice:
+            cs_info += f", Giọng Anh: {paired_en_voice}"
+        cs_info += ")"
+        print(f" Song ngữ (Code-Switch): {cs_info}")
+    else:
+        print(" Song ngữ (Code-Switch): Tắt (Chỉ đọc giọng đơn)")
     print(f" Engine:              {engine}")
     print("-" * 55)
 
@@ -326,6 +367,9 @@ def main():
             emotions=emotions_enabled,
             default_emotion=def_emotion,
             auto_emotion=auto_emotion,
+            code_switch=code_switch,
+            paired_voice_id=paired_en_voice,
+            auto_detect_en=auto_lang,
             progress_callback=progress,
         )
         sys.stdout.write("\n")
