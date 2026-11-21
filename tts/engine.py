@@ -272,7 +272,7 @@ class TTSEngine:
                 auto_emotion=auto_emotion,
             )
             for cs in cs_segments:
-                sub_chunks = split_text_into_chunks(cs.text, max_chars=1200)
+                sub_chunks = split_text_into_chunks(cs.text, max_chars=350)
                 c_rate, c_pitch, c_vol, eff_speed = combine_emotion_and_speed(
                     preset=cs.emotion_preset,
                     user_speed_multiplier=user_speed_mult,
@@ -305,7 +305,7 @@ class TTSEngine:
                 segments = [(plain, def_preset)]
 
             for seg_text, seg_preset in segments:
-                sub_chunks = split_text_into_chunks(seg_text, max_chars=1200)
+                sub_chunks = split_text_into_chunks(seg_text, max_chars=350)
                 c_rate, c_pitch, c_vol, eff_speed = combine_emotion_and_speed(
                     preset=seg_preset,
                     user_speed_multiplier=user_speed_mult,
@@ -407,31 +407,47 @@ class TTSEngine:
                         )
 
                     chunk_success = False
-                    try:
-                        communicate = edge_tts.Communicate(
-                            text=chunk.text,
-                            voice=v_target,
-                            rate=chunk.rate,
-                            pitch=chunk.pitch,
-                            volume=chunk.volume,
-                        )
-                        async for message in communicate.stream():
-                            if message["type"] == "audio":
-                                f_out.write(message["data"])
+                    for attempt in range(1, 4):
+                        try:
+                            communicate = edge_tts.Communicate(
+                                text=chunk.text,
+                                voice=v_target,
+                                rate=chunk.rate,
+                                pitch=chunk.pitch,
+                                volume=chunk.volume,
+                            )
+                            chunk_data = bytearray()
+                            async for message in communicate.stream():
+                                if message["type"] == "audio":
+                                    chunk_data.extend(message["data"])
+                            if chunk_data:
+                                f_out.write(chunk_data)
                                 chunk_success = True
-                    except Exception:
-                        chunk_success = False
+                                break
+                            else:
+                                raise edge_tts.exceptions.NoAudioReceived(
+                                    "No audio received from Edge-TTS stream"
+                                )
+                        except Exception:
+                            if attempt < 3:
+                                await asyncio.sleep(0.8 * attempt)
+                            else:
+                                chunk_success = False
 
                     if not chunk_success:
                         if progress_callback:
                             progress_callback(
                                 pct,
-                                f"Chuyển đoạn {idx} ([{l_target.upper()}]) sang Google TTS dự phòng...",
+                                f"Cảnh báo: Đoạn {idx} ([{l_target.upper()}]) không thể đọc bằng {voice_short}, chuyển sang Google TTS dự phòng...",
                             )
                         fallback_data = self._get_gtts_audio_bytes(
                             chunk.text, l_target, speed_multiplier=chunk.speed_multiplier
                         )
                         f_out.write(fallback_data)
+                    else:
+                        # Khoảng nghỉ nhỏ (pacing) giữa các đoạn để tránh quá tải kết nối WebSocket
+                        if idx < len(chunks):
+                            await asyncio.sleep(0.15)
 
                     if progress_callback:
                         pct_done = 0.1 + (0.85 * idx / len(chunks))

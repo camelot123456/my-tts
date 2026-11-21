@@ -15,7 +15,7 @@ from tkinter import filedialog, messagebox, ttk
 from typing import Dict
 
 from tts.code_switch import get_paired_voice
-from tts.config import VoiceInfo, get_voices_for_language
+from tts.config import DEFAULT_VOICES, VoiceInfo, get_voices_for_language
 from tts.emotion import EMOTION_PRESETS, get_emotion_preset
 from tts.engine import TTSEngine, parse_speed
 from tts.text_processor import read_text_file
@@ -683,7 +683,7 @@ class TTSAppGUI:
         self.cb_paired_voice.config(state="readonly" if enabled else tk.DISABLED)
 
     def _on_voice_changed(self, event=None):
-        selected_display = self.var_voice_name.get()
+        selected_display = self.cb_voice.get() or self.var_voice_name.get()
         base_v = self.voice_map.get(selected_display)
         if not base_v:
             return
@@ -692,6 +692,7 @@ class TTSAppGUI:
         for d_name, v_info in self.paired_voice_map.items():
             if v_info.id == paired_id:
                 self.cb_paired_voice.set(d_name)
+                self.var_paired_voice.set(d_name)
                 break
 
     def set_speed(self, multiplier: float):
@@ -797,8 +798,21 @@ class TTSAppGUI:
 
         self.cb_voice["values"] = display_names
         if display_names:
-            self.cb_voice.current(0)
-            self.var_voice_name.set(display_names[0])
+            curr_selection = self.cb_voice.get() or self.var_voice_name.get()
+            selected_idx = -1
+            if curr_selection in display_names:
+                selected_idx = display_names.index(curr_selection)
+            else:
+                default_voice_id = DEFAULT_VOICES.get(lang)
+                for idx, d_name in enumerate(display_names):
+                    v_info = self.voice_map.get(d_name)
+                    if v_info and v_info.id == default_voice_id:
+                        selected_idx = idx
+                        break
+            if selected_idx < 0:
+                selected_idx = 0
+            self.cb_voice.current(selected_idx)
+            self.var_voice_name.set(display_names[selected_idx])
 
         # Update paired voices for Code-Switching
         paired_lang = "en" if lang.startswith("vi") else "vi"
@@ -825,6 +839,7 @@ class TTSAppGUI:
                     break
             if matched_name:
                 self.cb_paired_voice.set(matched_name)
+                self.var_paired_voice.set(matched_name)
             else:
                 self.cb_paired_voice.current(0)
                 self.var_paired_voice.set(paired_display_names[0])
@@ -860,7 +875,7 @@ class TTSAppGUI:
         self._on_speed_spin_changed()
         speed_mult, rate_str = parse_speed(self.var_speed_spin.get())
 
-        selected_display = self.var_voice_name.get()
+        selected_display = self.cb_voice.get() or self.var_voice_name.get()
         voice_info = self.voice_map.get(selected_display)
         voice_id = voice_info.id if voice_info else None
 
@@ -877,7 +892,7 @@ class TTSAppGUI:
         # Code-switching selection
         code_switch_enabled = self.var_code_switch.get()
         auto_lang = self.var_auto_lang.get()
-        selected_paired_display = self.var_paired_voice.get()
+        selected_paired_display = self.cb_paired_voice.get() or self.var_paired_voice.get()
         paired_voice_info = self.paired_voice_map.get(selected_paired_display)
         paired_voice_id = paired_voice_info.id if paired_voice_info else None
 

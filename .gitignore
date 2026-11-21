@@ -20,9 +20,13 @@ dist/
 .coverage
 htmlcov/
 
-# Generated audio output
+# Generated audio output & subtitles
 *.mp3
 *.wav
+*.srt
+
+# VTS Local Config (API keys)
+.vts_config.json
 
 # Sample texts and personal text inputs
 sample_texts/

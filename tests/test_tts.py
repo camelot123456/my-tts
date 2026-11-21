@@ -40,10 +40,12 @@ class TestTTSConfig(unittest.TestCase):
         en_voice = DEFAULT_VOICES["en"]
         self.assertIn(vi_voice, VOICE_CATALOG)
         self.assertIn(en_voice, VOICE_CATALOG)
+        self.assertEqual(vi_voice, "vi-VN-NamMinhNeural")
 
     def test_get_voices_for_language(self):
         vi_voices = get_voices_for_language("vi")
         self.assertGreaterEqual(len(vi_voices), 2)
+        self.assertEqual(vi_voices[0].id, "vi-VN-NamMinhNeural")
         for v in vi_voices:
             self.assertTrue(v.language.startswith("vi"))
 
@@ -112,6 +114,11 @@ class TestTextProcessor(unittest.TestCase):
         raw = "  Dòng 1   với nhiều khoảng trắng.   \r\n\r\nDòng 2\r\n\n\n\nDòng 3.  "
         cleaned = clean_text(raw)
         self.assertEqual(cleaned, "Dòng 1 với nhiều khoảng trắng.\n\nDòng 2\n\nDòng 3.")
+
+    def test_clean_text_normalizes_quotes(self):
+        raw = 'Chào bạn: “Một câu nói trong ngoặc kép” và ‘ngoặc đơn’.'
+        cleaned = clean_text(raw)
+        self.assertEqual(cleaned, 'Chào bạn: "Một câu nói trong ngoặc kép" và \'ngoặc đơn\'.')
 
     def test_split_text_into_chunks(self):
         short_text = "Câu ngắn dưới 100 ký tự."

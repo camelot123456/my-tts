@@ -17,14 +17,6 @@ class VoiceInfo:
 # Danh mục giọng đọc ưu tiên cho Tiếng Việt và Tiếng Anh
 VOICE_CATALOG: Dict[str, VoiceInfo] = {
     # --- Tiếng Việt (Edge-TTS AI Neural) ---
-    "vi-VN-HoaiMyNeural": VoiceInfo(
-        id="vi-VN-HoaiMyNeural",
-        name="Hoài My (Nữ - Tự nhiên, truyền cảm)",
-        language="vi-VN",
-        gender="Female",
-        engine="edge-tts",
-        description="Giọng đọc nữ miền Bắc/chuẩn tự nhiên của Microsoft AI Neural.",
-    ),
     "vi-VN-NamMinhNeural": VoiceInfo(
         id="vi-VN-NamMinhNeural",
         name="Nam Minh (Nam - Trầm ấm, rõ ràng)",
@@ -32,6 +24,14 @@ VOICE_CATALOG: Dict[str, VoiceInfo] = {
         gender="Male",
         engine="edge-tts",
         description="Giọng đọc nam truyền cảm, phong cách tin tức/thuyết minh.",
+    ),
+    "vi-VN-HoaiMyNeural": VoiceInfo(
+        id="vi-VN-HoaiMyNeural",
+        name="Hoài My (Nữ - Tự nhiên, truyền cảm)",
+        language="vi-VN",
+        gender="Female",
+        engine="edge-tts",
+        description="Giọng đọc nữ miền Bắc/chuẩn tự nhiên của Microsoft AI Neural.",
     ),
     # --- Tiếng Việt (gTTS Fallback) ---
     "gtts-vi": VoiceInfo(

@@ -218,6 +218,7 @@ python main.py
 
 ```
 my_TTS/
+├── # --- Module TTS (Text-to-Speech) ---
 ├── tts/
 │   ├── __init__.py
 │   ├── code_switch.py      # Mixed-language parser, gender voice pairing & auto-detection
@@ -225,22 +226,65 @@ my_TTS/
 │   ├── emotion.py          # Emotion presets, tag parsing, and parameter blending
 │   ├── text_processor.py   # Multi-encoding file reader and sentence chunker
 │   └── engine.py          # Core synthesis engine (Edge-TTS, gTTS, PyAV speed filter)
-├── sample_texts/
-│   ├── tieng_viet.txt      # Vietnamese sample text
-│   ├── english.txt         # English sample text
-│   ├── cam_xuc.txt         # Multilingual emotion tags sample text
-│   └── song_ngu.txt        # Bilingual mixed-language sample text
-├── tests/
+├── main.py                 # TTS CLI entry point
+├── gui.py                  # TTS Desktop GUI entry point
+├── Run_GUI.bat / Chay_GUI.bat # Launchers for TTS GUI
+│
+├── # --- Module VTS (Video-to-Script / Video-to-Sub) [Độc lập] ---
+├── vts/
 │   ├── __init__.py
-│   └── test_tts.py         # Automated test suite (25 unit tests)
-├── main.py                 # Command-line interface (CLI) entry point
-├── gui.py                  # Desktop graphical user interface (GUI) entry point
-├── Run_GUI.bat             # Windows one-click GUI launcher (English)
-├── Chay_GUI.bat            # Windows one-click GUI launcher (Vietnamese)
-├── requirements.txt        # Python package dependencies
-├── .gitignore              # Git ignore rules for artifacts & caches
+│   ├── client.py           # Gemini Multimodal Vision API client
+│   ├── config.py           # VTS configuration & style presets
+│   ├── formatter.py        # Script & Subtitle formatter (.txt, .srt)
+│   └── prompts.py          # Vision analysis prompts by genres
+├── vts_cli.py              # VTS CLI entry point
+├── vts_gui.py              # VTS Desktop GUI entry point
+├── Run_VTS.bat / Chay_VTS.bat # Launchers for VTS GUI
+├── requirements-vts.txt    # VTS dependencies (google-generativeai)
+│
+├── sample_texts/           # Sample text files (.txt)
+├── tests/
+│   ├── test_tts.py         # TTS test suite (25 unit tests)
+│   └── test_vts.py         # VTS test suite (13 unit tests)
+├── requirements.txt        # Full dependencies
+├── AGENTS.md               # AI Agent operating guidelines
 └── README.md               # Complete documentation
 ```
+
+---
+
+## 🎬 my_VTS: Video to Script & Subtitle Generator (Độc lập)
+
+`my_VTS` là công cụ **hoàn toàn độc lập** với `my_TTS`, giúp bạn phân tích ngữ cảnh hình ảnh trong video (kể cả **video câm, không lời thoại, không chữ viết**) và tự động biên soạn kịch bản / phụ đề `.txt` và `.srt`.
+
+### 1. Khởi chạy Giao diện Desktop (GUI)
+- Nhấp đúp vào **`Run_VTS.bat`** (hoặc **`Chay_VTS.bat`**).
+- Hoặc chạy lệnh:
+  ```bash
+  python vts_gui.py
+  ```
+
+### 2. Sử dụng qua dòng lệnh (CLI)
+```bash
+# Xem danh sách các phong cách hỗ trợ (recap, tiktok, documentary, monologue, descriptive)
+python vts_cli.py --list-styles
+
+# Phân tích video và xuất kịch bản .txt kèm thẻ cảm xúc
+python vts_cli.py my_video.mp4 -o my_script.txt --style recap
+
+# Xuất đồng thời tệp phụ đề tiêu chuẩn .srt
+python vts_cli.py my_video.mp4 -o my_script.txt --srt
+
+# Nhập và lưu Gemini API Key
+python vts_cli.py my_video.mp4 --api-key YOUR_API_KEY --save-key
+```
+
+### 3. Phối hợp nhịp nhàng giữa VTS và TTS:
+1. Dùng `my_VTS` để xem video và tạo kịch bản `kich_ban.txt` (đã tự động gán sẵn các thẻ cảm xúc `[vui]`, `[hao_hung]`, `[thi_tham]`).
+2. Nạp file `kich_ban.txt` sang `my_TTS` để tạo âm thanh `.mp3` chuẩn giọng bản ngữ:
+   ```bash
+   python main.py kich_ban.txt -o thuyet_minh.mp3 --voice namminh
+   ```
 
 ---
 
@@ -248,6 +292,8 @@ my_TTS/
 
 Run automated unit tests:
 ```bash
-python -m unittest discover tests
+python -m unittest discover tests -v
 ```
-All 25 tests verify encoding detection, text chunking, speed multiplier parsing, audio stretching, emotion tag extraction, and bilingual code-switching with gender-matched voice pairing.
+Toàn bộ 38 bài kiểm thử (25 tests cho TTS và 13 tests cho VTS) tự động xác minh:
+- Tự động nhận diện encoding, chia chunk, parse speed, time-stretching qua PyAV, thẻ cảm xúc và code-switching cho **TTS**.
+- Phân tích kịch bản, chuyển đổi timestamp sang SRT chuẩn, lưu file, xử lý lỗi và phân đoạn đa phong cách cho **VTS**.

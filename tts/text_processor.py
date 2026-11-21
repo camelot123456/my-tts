@@ -77,6 +77,15 @@ def clean_text(text: str) -> str:
     # Loại bỏ ký tự điều khiển ẩn (giữ lại newline và tab)
     text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
 
+    # Chuẩn hóa dấu ngoặc kép / đơn cong (curly quotes)
+    text = (
+        text.replace("“", '"')
+        .replace("”", '"')
+        .replace("„", '"')
+        .replace("‘", "'")
+        .replace("’", "'")
+    )
+
     # Thu gọn khoảng trắng thừa trên từng dòng
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.split("\n")]
 
